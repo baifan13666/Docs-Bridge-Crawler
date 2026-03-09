@@ -15,6 +15,9 @@ env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;
 
+// Disable cache to save memory on Vercel
+env.cacheDir = null;
+
 // Model configurations - MUST use e5 models
 const SMALL_MODEL = 'Xenova/e5-small-v2'; // 384-dim
 const LARGE_MODEL = 'Xenova/e5-large-v2'; // 1024-dim
@@ -22,14 +25,24 @@ const LARGE_MODEL = 'Xenova/e5-large-v2'; // 1024-dim
 // Singleton instances
 let smallPipeline: any = null;
 let largePipeline: any = null;
+let isInitializingSmall = false;
+let isInitializingLarge = false;
 
 /**
  * Initialize e5-small model (384-dim)
  */
 async function initSmallModel() {
   if (smallPipeline) return smallPipeline;
+  
+  // Wait if already initializing
+  while (isInitializingSmall) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (smallPipeline) return smallPipeline;
 
   try {
+    isInitializingSmall = true;
     console.log('[Embeddings] Initializing e5-small model (384-dim) with WASM backend...');
     
     smallPipeline = await pipeline('feature-extraction', SMALL_MODEL, {
@@ -42,6 +55,8 @@ async function initSmallModel() {
     console.error('[Embeddings] Failed to initialize e5-small:', error);
     smallPipeline = null;
     throw error;
+  } finally {
+    isInitializingSmall = false;
   }
 }
 
@@ -50,8 +65,16 @@ async function initSmallModel() {
  */
 async function initLargeModel() {
   if (largePipeline) return largePipeline;
+  
+  // Wait if already initializing
+  while (isInitializingLarge) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (largePipeline) return largePipeline;
 
   try {
+    isInitializingLarge = true;
     console.log('[Embeddings] Initializing e5-large model (1024-dim) with WASM backend...');
     
     largePipeline = await pipeline('feature-extraction', LARGE_MODEL, {
@@ -64,44 +87,37 @@ async function initLargeModel() {
     console.error('[Embeddings] Failed to initialize e5-large:', error);
     largePipeline = null;
     throw error;
+  } finally {
+    isInitializingLarge = false;
   }
 }
 
 /**
  * Generate dual embeddings (both 384-dim and 1024-dim)
+ * Sequential to save memory
  */
 export async function generateDualEmbeddings(text: string): Promise<{
   small: number[];
   large: number[];
 }> {
   try {
-    console.log('[Embeddings] Generating dual embeddings...');
-    
     // For documents, use "passage: " prefix (e5 models requirement)
     const prefixedText = text.startsWith('passage: ') ? text : `passage: ${text}`;
     
-    // Generate both embeddings in parallel
-    const [small, large] = await Promise.all([
-      (async () => {
-        const model = await initSmallModel();
-        const output = await model(prefixedText, {
-          pooling: 'mean',
-          normalize: true,
-        });
-        return Array.from(output.data) as number[];
-      })(),
-      (async () => {
-        const model = await initLargeModel();
-        const output = await model(prefixedText, {
-          pooling: 'mean',
-          normalize: true,
-        });
-        return Array.from(output.data) as number[];
-      })(),
-    ]);
+    // Generate sequentially to save memory (not parallel)
+    const smallModel = await initSmallModel();
+    const smallOutput = await smallModel(prefixedText, {
+      pooling: 'mean',
+      normalize: true,
+    });
+    const small = Array.from(smallOutput.data) as number[];
     
-    console.log('[Embeddings] ✅ Dual embeddings generated');
-    console.log(`[Embeddings] Small: ${small.length}-dim, Large: ${large.length}-dim`);
+    const largeModel = await initLargeModel();
+    const largeOutput = await largeModel(prefixedText, {
+      pooling: 'mean',
+      normalize: true,
+    });
+    const large = Array.from(largeOutput.data) as number[];
     
     return { small, large };
   } catch (error) {
@@ -112,6 +128,7 @@ export async function generateDualEmbeddings(text: string): Promise<{
 
 /**
  * Generate batch dual embeddings for multiple texts
+ * Process sequentially to avoid memory issues
  */
 export async function generateBatchDualEmbeddings(texts: string[]): Promise<Array<{
   small: number[];
@@ -119,10 +136,16 @@ export async function generateBatchDualEmbeddings(texts: string[]): Promise<Arra
 }>> {
   try {
     console.log(`[Embeddings] Generating batch dual embeddings for ${texts.length} texts...`);
+    console.log('[Embeddings] Processing sequentially to conserve memory...');
     
-    const results = await Promise.all(
-      texts.map(text => generateDualEmbeddings(text))
-    );
+    const results: Array<{ small: number[]; large: number[] }> = [];
+    
+    // Process one at a time to save memory
+    for (let i = 0; i < texts.length; i++) {
+      console.log(`[Embeddings] Processing ${i + 1}/${texts.length}...`);
+      const embedding = await generateDualEmbeddings(texts[i]);
+      results.push(embedding);
+    }
     
     console.log(`[Embeddings] ✅ Batch dual embeddings completed: ${results.length} items`);
     return results;
