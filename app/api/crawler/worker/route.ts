@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Receiver } from '@upstash/qstash';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { getSourceById } from '@/lib/crawler/sources';
 import { crawlHTML, isValidCrawlURL } from '@/lib/crawler/html';
 import { crawlPDF, isValidPDFURL } from '@/lib/crawler/pdf';
@@ -197,8 +197,8 @@ export async function POST(request: NextRequest) {
     // Sanitize content
     const sanitizedContent = sanitizeContent(normalizedDoc.content);
 
-    // Create Supabase client
-    const supabase = await createClient();
+    // Create Supabase service client (bypasses RLS for system operations)
+    const supabase = createServiceClient();
 
     // Check if document already exists (by source_url)
     const { data: existingDoc } = await supabase
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
         .eq('document_id', documentId);
 
     } else {
-      // Insert new document (use system user for gov documents)
+      // Insert new document (service role bypasses RLS)
       console.log('[Crawler Worker] Creating new document...');
       
       const { data: document, error: dbError } = await supabase
@@ -266,9 +266,14 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (dbError || !document) {
-        console.error('[Crawler Worker] Database error:', dbError);
+        console.error('[Crawler Worker] Database error:', {
+          code: dbError?.code,
+          message: dbError?.message,
+          details: dbError?.details,
+          hint: dbError?.hint
+        });
         return NextResponse.json(
-          { success: false, error: 'Failed to save document' },
+          { success: false, error: 'Failed to save document', details: dbError?.message },
           { status: 500 }
         );
       }

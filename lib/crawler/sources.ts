@@ -152,7 +152,7 @@ export const GOVERNMENT_SOURCES: GovernmentSource[] = [
     id: 'dswd-4ps',
     name: 'DSWD 4Ps Program',
     country: 'philippines',
-    url: 'https://www.dswd.gov.ph/programs/pantawid-pamilyang-pilipino-program/',
+    url: 'https://fo1.dswd.gov.ph/programs/poverty-reduction-programs/pantawid-pamilyang-pilipino-program/',
     type: 'html',
     trust_level: 5,
     category: 'social-services',
