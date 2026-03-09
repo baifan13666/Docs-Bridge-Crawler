@@ -16,6 +16,7 @@ import { crawlPDF, isValidPDFURL } from '@/lib/crawler/pdf';
 import { normalizeHTMLDocument, normalizePDFDocument, validateDocument, sanitizeContent } from '@/lib/crawler/normalize';
 import { chunkDocument } from '@/lib/nlp/chunking';
 import { generateBatchDualEmbeddings } from '@/lib/embeddings/server-dual';
+import { getQStashClient } from '@/lib/qstash/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
