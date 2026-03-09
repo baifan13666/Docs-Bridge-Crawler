@@ -15,7 +15,6 @@ import { crawlHTML, isValidCrawlURL } from '@/lib/crawler/html';
 import { crawlPDF, isValidPDFURL } from '@/lib/crawler/pdf';
 import { normalizeHTMLDocument, normalizePDFDocument, validateDocument, sanitizeContent } from '@/lib/crawler/normalize';
 import { chunkDocument } from '@/lib/nlp/chunking';
-import { generateBatchDualEmbeddings } from '@/lib/embeddings/server-dual';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -341,7 +340,22 @@ export async function POST(request: NextRequest) {
     console.log('[Crawler Worker] - Large (1024-dim): for accurate reranking');
     
     const chunkTexts = chunks.map(c => c.text);
-    const embeddings = await generateBatchDualEmbeddings(chunkTexts);
+    
+    // Call Edge Runtime embedding API
+    const embeddingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ texts: chunkTexts }),
+    });
+
+    if (!embeddingResponse.ok) {
+      const errorData = await embeddingResponse.json();
+      throw new Error(`Embedding API error: ${errorData.message || 'Unknown error'}`);
+    }
+
+    const { embeddings } = await embeddingResponse.json();
 
     console.log(`[Crawler Worker] Generated ${embeddings.length} dual embeddings`);
 
