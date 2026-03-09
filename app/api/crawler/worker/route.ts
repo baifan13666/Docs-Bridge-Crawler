@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Receiver } from '@upstash/qstash';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 import { getSourceById } from '@/lib/crawler/sources';
 import { crawlHTML, isValidCrawlURL } from '@/lib/crawler/html';
 import { crawlPDF, isValidPDFURL } from '@/lib/crawler/pdf';
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const sanitizedContent = sanitizeContent(normalizedDoc.content);
 
     // Create Supabase client
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Check if document already exists (by source_url)
     const { data: existingDoc } = await supabase

@@ -1,5 +1,6 @@
 /**
  * QStash Client for Crawler Service
+ * Updated for @upstash/qstash v2.3.0+
  */
 
 import { Client } from '@upstash/qstash';
@@ -11,14 +12,15 @@ export function getQStashClient(): Client {
     return _qstashClient;
   }
 
-  const qstashToken = process.env.QSTASH_TOKEN;
-
-  if (!qstashToken) {
-    throw new Error('QSTASH_TOKEN environment variable is required');
-  }
-
+  // Client automatically reads QSTASH_TOKEN from environment variables
+  // Optional: configure retry and telemetry
   _qstashClient = new Client({
-    token: qstashToken,
+    token: process.env.QSTASH_TOKEN!,
+    retry: {
+      retries: 3,
+      backoff: (retryCount: number) => Math.exp(retryCount) * 50,
+    },
+    enableTelemetry: true, // Default: true
   });
 
   return _qstashClient;
