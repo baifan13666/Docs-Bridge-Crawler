@@ -13,10 +13,12 @@
 ### next.config.ts
 ```typescript
 const nextConfig: NextConfig = {
-  // 禁用 Turbopack
-  experimental: {
-    serverComponentsExternalPackages: ['sharp', 'onnxruntime-node'],
-  },
+  // 需要空的 turbopack 配置来允许 webpack 配置
+  turbopack: {},
+  
+  // Next.js 16: serverComponentsExternalPackages 移到了 serverExternalPackages
+  serverExternalPackages: ['sharp', 'onnxruntime-node'],
+  
   webpack: (config, { isServer }) => {
     if (isServer) {
       // 排除 native modules
@@ -95,5 +97,10 @@ Worker (Node.js) → @xenova/transformers (WASM backend) ✅
 
 ### 如果看到 "Failed to load external module"
 - 这说明 webpack 配置没有生效
-- 确认使用 webpack 而不是 Turbopack
-- 检查 `next.config.ts` 中没有 `turbopack: {}` 配置
+- 确认 `next.config.ts` 中有 `turbopack: {}` 配置（允许 webpack 配置共存）
+- 确认 `serverExternalPackages` 包含 `onnxruntime-node` 和 `sharp`
+
+### Next.js 16 注意事项
+- Next.js 16 默认使用 Turbopack
+- 如果有 webpack 配置，必须同时有 `turbopack: {}` 配置
+- `serverComponentsExternalPackages` 已移到 `serverExternalPackages`
