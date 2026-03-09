@@ -30,15 +30,39 @@ export async function crawlHTML(url: string): Promise<CrawledHTMLContent> {
   try {
     console.log(`[HTML Crawler] Fetching: ${url}`);
     
-    // Fetch HTML content
+    // Fetch HTML content with realistic browser headers
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; DocsBridge/1.0; +https://docsbridge.com/bot)'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      // Add timeout and redirect handling
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+      redirect: 'follow'
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+      console.error(`[HTML Crawler] ${errorMsg}`);
+      
+      // Provide more context for common errors
+      if (response.status === 403) {
+        throw new Error(`${errorMsg} - Website may be blocking automated access`);
+      } else if (response.status === 404) {
+        throw new Error(`${errorMsg} - Page not found`);
+      } else if (response.status >= 500) {
+        throw new Error(`${errorMsg} - Server error`);
+      }
+      
+      throw new Error(errorMsg);
     }
 
     const html = await response.text();

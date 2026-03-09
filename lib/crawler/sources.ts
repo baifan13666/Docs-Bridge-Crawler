@@ -24,6 +24,9 @@ export interface GovernmentSource {
   crawl_frequency?: 'daily' | 'weekly' | 'monthly';
   priority?: 'high' | 'medium' | 'low'; // High = most useful for RAG
   content_type?: 'faq' | 'guide' | 'policy' | 'homepage'; // FAQ is gold for RAG
+  requires_js?: boolean; // Requires JavaScript rendering (SPA)
+  disabled?: boolean; // Temporarily disabled
+  disabled_reason?: string; // Why it's disabled
 }
 
 export const GOVERNMENT_SOURCES: GovernmentSource[] = [
@@ -238,7 +241,9 @@ export const GOVERNMENT_SOURCES: GovernmentSource[] = [
     description: 'Health programs, vaccination, medical assistance',
     crawl_frequency: 'weekly',
     priority: 'medium',
-    content_type: 'guide'
+    content_type: 'guide',
+    disabled: true,
+    disabled_reason: 'Returns 403 Forbidden - anti-bot protection'
   },
   
   // ========================================
@@ -258,7 +263,10 @@ export const GOVERNMENT_SOURCES: GovernmentSource[] = [
     description: 'Government assistance finder: what help can I get? Perfect for RAG',
     crawl_frequency: 'weekly',
     priority: 'high',
-    content_type: 'faq'
+    content_type: 'faq',
+    requires_js: true,
+    disabled: true,
+    disabled_reason: 'Requires JavaScript rendering (SPA) - needs Puppeteer/Playwright'
   },
   
   // Government Portal
@@ -481,4 +489,25 @@ export function getSourcesByPriority(priority: 'high' | 'medium' | 'low'): Gover
  */
 export function getFAQSources(): GovernmentSource[] {
   return GOVERNMENT_SOURCES.filter(source => source.content_type === 'faq');
+}
+
+/**
+ * Get enabled sources (not disabled)
+ */
+export function getEnabledSources(): GovernmentSource[] {
+  return GOVERNMENT_SOURCES.filter(source => !source.disabled);
+}
+
+/**
+ * Get disabled sources
+ */
+export function getDisabledSources(): GovernmentSource[] {
+  return GOVERNMENT_SOURCES.filter(source => source.disabled);
+}
+
+/**
+ * Get sources that require JavaScript rendering
+ */
+export function getJSRequiredSources(): GovernmentSource[] {
+  return GOVERNMENT_SOURCES.filter(source => source.requires_js);
 }

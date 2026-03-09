@@ -110,6 +110,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if source is disabled
+    if (source.disabled) {
+      console.warn('[Crawler Worker] ⚠️ Source is disabled:', source_id);
+      console.warn('[Crawler Worker] Reason:', source.disabled_reason || 'No reason provided');
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Source is disabled', 
+          reason: source.disabled_reason,
+          skipped: true 
+        },
+        { status: 200 } // Return 200 so QStash doesn't retry
+      );
+    }
+
     console.log('[Crawler Worker] Source found:', {
       id: source.id,
       name: source.name,
@@ -252,6 +267,7 @@ export async function POST(request: NextRequest) {
         .from('kb_documents')
         .insert({
           user_id: process.env.SYSTEM_USER_ID || '00000000-0000-0000-0000-000000000000',
+          folder_id: process.env.SYSTEM_FOLDER_ID || '00000000-0000-0000-0000-000000000000',
           title: normalizedDoc.title,
           content: sanitizedContent,
           document_type: normalizedDoc.document_type,
