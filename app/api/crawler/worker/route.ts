@@ -234,7 +234,8 @@ export async function POST(request: NextRequest) {
           id: systemFolderId,
           user_id: systemUserId,
           name: 'Government Documents',
-          description: 'Automatically crawled government documents from official sources'
+          folder_type:"offical_gov",
+          is_system: true
         });
 
       if (folderError) {
