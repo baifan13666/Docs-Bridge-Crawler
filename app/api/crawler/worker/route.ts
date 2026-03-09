@@ -347,13 +347,13 @@ export async function POST(request: NextRequest) {
     console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} embeddings`);
 
     // Step 3: Save chunks with embeddings to database
-    console.log('[Crawler Worker] Step 3: Saving chunks with dual embeddings...');
+    console.log('[Crawler Worker] Step 3: Saving chunks with 384-dim embeddings...');
     const chunksToInsert = chunks.map((chunk, index) => ({
       document_id: documentId,
       chunk_text: chunk.text,
       chunk_index: chunk.index,
-      embedding_small: embeddings[index].small,  // 384-dim for coarse search
-      embedding_large: embeddings[index].large,  // 1024-dim for reranking
+      embedding_small: embeddings[index].small,  // 384-dim from bge-small-en
+      embedding_large: null,  // Will be generated asynchronously
       token_count: chunk.tokenCount,
       language: normalizedDoc.metadata.language || null
     }));
@@ -374,7 +374,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Crawler Worker] ✅ Saved ${chunks.length} chunks with dual embeddings`);
+    console.log(`[Crawler Worker] ✅ Saved ${chunks.length} chunks with 384-dim embeddings`);
+
+    // Step 4: Queue 1024-dim embedding generation (async)
+    console.log('[Crawler Worker] Step 4: Queueing 1024-dim embedding generation...');
+    try {
+      const qstashClient = getQStashClient();
+      await qstashClient.publishJSON({
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/embeddings/large`,
+        body: {
+          document_id: documentId,
+          triggered_by: 'crawler_worker',
+          timestamp: new Date().toISOString()
+        }
+      });
+      console.log('[Crawler Worker] ✅ Queued 1024-dim embedding generation');
+    } catch (queueError) {
+      console.error('[Crawler Worker] ⚠️ Failed to queue 1024-dim embeddings:', queueError);
+      // Don't fail the whole request, just log the error
+    }
 
     console.log('[Crawler Worker] ✅ Crawl and processing completed successfully');
     console.log('[Crawler Worker] ========================================');

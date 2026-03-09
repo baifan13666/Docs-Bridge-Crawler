@@ -1,39 +1,34 @@
 /**
- * Node.js Runtime Embeddings with WASM Backend
+ * Local Embeddings with bge-small-en
  * 
- * Uses @xenova/transformers with WASM backend (not native ONNX)
- * Works on Vercel Node.js runtime
- * 
- * MEMORY OPTIMIZATION: Only uses e5-small to fit in 1GB limit
+ * Uses @xenova/transformers with WASM backend
+ * Only generates 384-dim embeddings locally
+ * 1024-dim embeddings are generated asynchronously via external API
  */
 
 import { pipeline, env } from '@xenova/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
-// Force WASM backend, disable native ONNX runtime
 env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.simd = true;
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;
-
-// Use /tmp for cache on Vercel (writable directory)
 env.cacheDir = '/tmp/.transformers-cache';
 
-// Model configuration - ONLY use e5-small to save memory
-const MODEL = 'Xenova/e5-small-v2'; // 384-dim
+// Model: bge-small-en for 384-dim embeddings
+const MODEL = 'Xenova/bge-small-en-v1.5'; // 384-dim
 
 // Singleton instance
 let pipeline_instance: any = null;
 let isInitializing = false;
 
 /**
- * Initialize e5-small model (384-dim)
+ * Initialize bge-small-en model (384-dim)
  */
 async function initModel() {
   if (pipeline_instance) return pipeline_instance;
   
-  // Wait if already initializing
   while (isInitializing) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
@@ -42,16 +37,16 @@ async function initModel() {
 
   try {
     isInitializing = true;
-    console.log('[Embeddings] Initializing e5-small model (384-dim) with WASM backend...');
+    console.log('[Embeddings] Initializing bge-small-en model (384-dim) with WASM backend...');
     
     pipeline_instance = await pipeline('feature-extraction', MODEL, {
       quantized: true,
     });
     
-    console.log('[Embeddings] ✅ e5-small model ready (WASM)');
+    console.log('[Embeddings] ✅ bge-small-en model ready (WASM)');
     return pipeline_instance;
   } catch (error) {
-    console.error('[Embeddings] Failed to initialize e5-small:', error);
+    console.error('[Embeddings] Failed to initialize bge-small-en:', error);
     pipeline_instance = null;
     throw error;
   } finally {
@@ -60,29 +55,24 @@ async function initModel() {
 }
 
 /**
- * Generate single embedding (384-dim)
- * For dual embedding compatibility, returns same embedding for both small and large
+ * Generate 384-dim embedding with bge-small-en
+ * Returns null for large embedding (will be generated asynchronously)
  */
 export async function generateDualEmbeddings(text: string): Promise<{
   small: number[];
-  large: number[];
+  large: number[] | null;
 }> {
   try {
-    // For documents, use "passage: " prefix (e5 models requirement)
-    const prefixedText = text.startsWith('passage: ') ? text : `passage: ${text}`;
-    
     const model = await initModel();
-    const output = await model(prefixedText, {
+    const output = await model(text, {
       pooling: 'mean',
       normalize: true,
     });
     const embedding = Array.from(output.data) as number[];
     
-    // Return same embedding for both (memory optimization)
-    // Database expects dual embeddings, so we provide the same one twice
     return { 
-      small: embedding,  // 384-dim
-      large: embedding   // 384-dim (same as small to save memory)
+      small: embedding,  // 384-dim from bge-small-en
+      large: null        // Will be generated asynchronously via API
     };
   } catch (error) {
     console.error('[Embeddings] Error generating embedding:', error);
@@ -91,20 +81,19 @@ export async function generateDualEmbeddings(text: string): Promise<{
 }
 
 /**
- * Generate batch embeddings for multiple texts
- * Process sequentially to avoid memory issues
+ * Generate batch 384-dim embeddings
  */
 export async function generateBatchDualEmbeddings(texts: string[]): Promise<Array<{
   small: number[];
-  large: number[];
+  large: number[] | null;
 }>> {
   try {
     console.log(`[Embeddings] Generating batch embeddings for ${texts.length} texts...`);
-    console.log('[Embeddings] Using single model (e5-small 384-dim) to conserve memory...');
+    console.log('[Embeddings] Using bge-small-en (384-dim) locally...');
+    console.log('[Embeddings] 1024-dim embeddings will be generated asynchronously via API');
     
-    const results: Array<{ small: number[]; large: number[] }> = [];
+    const results: Array<{ small: number[]; large: number[] | null }> = [];
     
-    // Process one at a time to save memory
     for (let i = 0; i < texts.length; i++) {
       console.log(`[Embeddings] Processing ${i + 1}/${texts.length}...`);
       const embedding = await generateDualEmbeddings(texts[i]);
