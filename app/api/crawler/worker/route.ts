@@ -215,6 +215,42 @@ export async function POST(request: NextRequest) {
     // Create Supabase service client (bypasses RLS for system operations)
     const supabase = createServiceClient();
 
+    // Ensure system folder exists
+    const systemFolderId = process.env.SYSTEM_FOLDER_ID || '00000000-0000-0000-0000-000000000000';
+    const systemUserId = process.env.SYSTEM_USER_ID || '00000000-0000-0000-0000-000000000000';
+
+    // Check if system folder exists, create if not
+    const { data: existingFolder } = await supabase
+      .from('kb_folders')
+      .select('id')
+      .eq('id', systemFolderId)
+      .single();
+
+    if (!existingFolder) {
+      console.log('[Crawler Worker] Creating system folder...');
+      const { error: folderError } = await supabase
+        .from('kb_folders')
+        .insert({
+          id: systemFolderId,
+          user_id: systemUserId,
+          name: 'Government Documents',
+          description: 'Automatically crawled government documents from official sources'
+        });
+
+      if (folderError) {
+        console.error('[Crawler Worker] Failed to create system folder:', folderError);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Failed to create system folder. Please ensure SYSTEM_USER_ID exists in auth.users table.',
+            details: folderError.message 
+          },
+          { status: 500 }
+        );
+      }
+      console.log('[Crawler Worker] ✅ System folder created');
+    }
+
     // Check if document already exists (by source_url)
     const { data: existingDoc } = await supabase
       .from('kb_documents')
@@ -266,8 +302,8 @@ export async function POST(request: NextRequest) {
       const { data: document, error: dbError } = await supabase
         .from('kb_documents')
         .insert({
-          user_id: process.env.SYSTEM_USER_ID || '00000000-0000-0000-0000-000000000000',
-          folder_id: process.env.SYSTEM_FOLDER_ID || '00000000-0000-0000-0000-000000000000',
+          user_id: systemUserId,
+          folder_id: systemFolderId,
           title: normalizedDoc.title,
           content: sanitizedContent,
           document_type: normalizedDoc.document_type,
