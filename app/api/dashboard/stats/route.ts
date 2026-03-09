@@ -3,7 +3,7 @@
  * 
  * GET /api/dashboard/stats
  * 
- * Returns real-time statistics about crawled documents
+ * Returns real-time statistics about crawled documents and crawl history
  */
 
 import { NextResponse } from 'next/server';
@@ -16,19 +16,23 @@ export async function GET() {
   try {
     const supabase = await createClient();
 
-    // Get recent documents with chunk counts
+    // Get recent documents with detailed info
     const { data: documents, error: docsError } = await supabase
       .from('kb_documents')
       .select(`
         id,
         title,
+        source_url,
         document_type,
         trust_level,
-        created_at
+        quality_score,
+        word_count,
+        created_at,
+        updated_at
       `)
       .eq('document_type', 'gov_crawled')
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(50);
 
     if (docsError) {
       console.error('[Dashboard] Error fetching documents:', docsError);
@@ -53,6 +57,19 @@ export async function GET() {
       })
     );
 
+    // Get crawl logs (mock for now - you can create a crawl_logs table)
+    // For now, we'll derive from documents
+    const crawlLogs = (documents || []).slice(0, 20).map(doc => ({
+      id: doc.id,
+      source_id: 'unknown',
+      source_name: doc.title,
+      source_url: doc.source_url,
+      status: 'success',
+      started_at: doc.created_at,
+      completed_at: doc.updated_at,
+      error_message: null
+    }));
+
     // Get total statistics
     const { count: totalDocs } = await supabase
       .from('kb_documents')
@@ -63,6 +80,17 @@ export async function GET() {
       .from('document_chunks')
       .select('*', { count: 'exact', head: true });
 
+    // Get embedding statistics
+    const { count: chunksWithSmall } = await supabase
+      .from('document_chunks')
+      .select('*', { count: 'exact', head: true })
+      .not('embedding_small', 'is', null);
+
+    const { count: chunksWithLarge } = await supabase
+      .from('document_chunks')
+      .select('*', { count: 'exact', head: true })
+      .not('embedding_large', 'is', null);
+
     // Get documents created today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -72,17 +100,33 @@ export async function GET() {
       .eq('document_type', 'gov_crawled')
       .gte('created_at', today.toISOString());
 
-    // Calculate average quality score (mock for now, can be added to schema)
-    const avgQualityScore = 85; // TODO: Calculate from actual quality_score field
+    // Calculate average quality score
+    const { data: qualityData } = await supabase
+      .from('kb_documents')
+      .select('quality_score')
+      .eq('document_type', 'gov_crawled')
+      .not('quality_score', 'is', null);
+
+    const avgQualityScore = qualityData && qualityData.length > 0
+      ? qualityData.reduce((sum, doc) => sum + (doc.quality_score || 0), 0) / qualityData.length
+      : 0;
+
+    const embeddingCompletionRate = totalChunks && totalChunks > 0
+      ? (chunksWithLarge || 0) / totalChunks * 100
+      : 0;
 
     return NextResponse.json({
       success: true,
       documents: documentsWithChunks,
+      crawl_logs: crawlLogs,
       stats: {
         total_documents: totalDocs || 0,
         total_chunks: totalChunks || 0,
         avg_quality_score: avgQualityScore,
-        documents_today: docsToday || 0
+        documents_today: docsToday || 0,
+        chunks_with_small: chunksWithSmall || 0,
+        chunks_with_large: chunksWithLarge || 0,
+        embedding_completion_rate: embeddingCompletionRate
       }
     });
 
