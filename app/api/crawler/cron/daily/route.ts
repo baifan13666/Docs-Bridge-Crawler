@@ -99,13 +99,15 @@ export async function GET(request: NextRequest) {
         
         const result = await qstashClient.publishJSON(publishOptions);
 
+        const messageId = Array.isArray(result) ? result[0]?.messageId : result.messageId;
+
         queuedJobs.push({
           source_id: source.id,
           source_name: source.name,
-          message_id: result.messageId
+          message_id: messageId
         });
 
-        console.log(`[Cron Daily] ✅ Queued: ${source.name} (messageId: ${result.messageId})`);
+        console.log(`[Cron Daily] ✅ Queued: ${source.name} (messageId: ${messageId})`);
       } catch (error) {
         console.error(`[Cron Daily] ❌ Failed to queue ${source.name}:`, error);
         failedJobs.push({

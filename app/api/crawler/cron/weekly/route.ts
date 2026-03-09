@@ -125,14 +125,16 @@ export async function GET(request: NextRequest) {
         
         const result = await qstashClient.publishJSON(publishOptions);
 
+        const messageId = Array.isArray(result) ? result[0]?.messageId : result.messageId;
+
         queuedJobs.push({
           source_id: source.id,
           source_name: source.name,
-          message_id: result.messageId
+          message_id: messageId
         });
 
         console.log(`[Cron Weekly] ✅ Queued: ${source.name}`);
-        console.log(`[Cron Weekly] Message ID: ${result.messageId}`);
+        console.log(`[Cron Weekly] Message ID: ${messageId}`);
       } catch (error) {
         console.error(`[Cron Weekly] ❌ Failed to queue ${source.name}`);
         console.error(`[Cron Weekly] Error details:`, {
