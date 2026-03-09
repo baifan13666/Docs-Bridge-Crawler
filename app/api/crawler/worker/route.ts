@@ -338,11 +338,15 @@ export async function POST(request: NextRequest) {
     console.log('[Crawler Worker] Using dual embedding strategy:');
     console.log('[Crawler Worker] - Small (384-dim): for fast coarse search');
     console.log('[Crawler Worker] - Large (1024-dim): for accurate reranking');
+    console.log('[Crawler Worker] Calling Edge Runtime embedding API...');
     
     const chunkTexts = chunks.map(c => c.text);
+    const embeddingApiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/embeddings`;
+    
+    console.log(`[Crawler Worker] Embedding API URL: ${embeddingApiUrl}`);
     
     // Call Edge Runtime embedding API
-    const embeddingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/embeddings`, {
+    const embeddingResponse = await fetch(embeddingApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -351,13 +355,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (!embeddingResponse.ok) {
-      const errorData = await embeddingResponse.json();
-      throw new Error(`Embedding API error: ${errorData.message || 'Unknown error'}`);
+      const errorText = await embeddingResponse.text();
+      console.error('[Crawler Worker] Embedding API error:', {
+        status: embeddingResponse.status,
+        statusText: embeddingResponse.statusText,
+        body: errorText,
+      });
+      throw new Error(`Embedding API error (${embeddingResponse.status}): ${errorText}`);
     }
 
-    const { embeddings } = await embeddingResponse.json();
+    const embeddingData = await embeddingResponse.json();
+    const { embeddings } = embeddingData;
 
-    console.log(`[Crawler Worker] Generated ${embeddings.length} dual embeddings`);
+    console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} dual embeddings via Edge API`);
 
     // Step 3: Save chunks with embeddings to database
     console.log('[Crawler Worker] Step 3: Saving chunks with dual embeddings...');

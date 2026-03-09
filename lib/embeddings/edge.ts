@@ -5,6 +5,12 @@
  * Compatible with Vercel Edge Runtime
  */
 
+import { pipeline, env } from '@xenova/transformers';
+
+// Configure for Edge Runtime at module level
+env.allowLocalModels = false;
+env.useBrowserCache = false;
+
 // Model configurations
 const SMALL_MODEL = 'Xenova/e5-small-v2'; // 384-dim
 const LARGE_MODEL = 'Xenova/e5-large-v2'; // 1024-dim
@@ -21,13 +27,6 @@ async function initSmallModel() {
 
   try {
     console.log('[Edge Embeddings] Initializing e5-small model (384-dim)...');
-    
-    // Dynamic import for Edge Runtime
-    const { pipeline, env } = await import('@xenova/transformers');
-    
-    // Configure for Edge Runtime (WASM only)
-    env.allowLocalModels = false;
-    env.useBrowserCache = false;
     
     smallPipeline = await pipeline('feature-extraction', SMALL_MODEL, {
       quantized: true,
@@ -50,13 +49,6 @@ async function initLargeModel() {
 
   try {
     console.log('[Edge Embeddings] Initializing e5-large model (1024-dim)...');
-    
-    // Dynamic import for Edge Runtime
-    const { pipeline, env } = await import('@xenova/transformers');
-    
-    // Configure for Edge Runtime (WASM only)
-    env.allowLocalModels = false;
-    env.useBrowserCache = false;
     
     largePipeline = await pipeline('feature-extraction', LARGE_MODEL, {
       quantized: true,
