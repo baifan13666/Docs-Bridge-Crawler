@@ -15,8 +15,8 @@ env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;
 
-// Disable cache to save memory on Vercel
-env.cacheDir = null;
+// Use /tmp for cache on Vercel (writable directory)
+env.cacheDir = '/tmp/.transformers-cache';
 
 // Model configurations - MUST use e5 models
 const SMALL_MODEL = 'Xenova/e5-small-v2'; // 384-dim

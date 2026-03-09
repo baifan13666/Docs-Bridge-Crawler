@@ -48,6 +48,7 @@ env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.simd = true;
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
+env.cacheDir = '/tmp/.transformers-cache'; // Vercel 可写目录
 ```
 
 ## 部署步骤
@@ -100,7 +101,7 @@ Worker (Node.js) → @xenova/transformers (WASM backend) ✅
 ## 内存优化
 
 Vercel 免费版限制 1GB 内存，优化措施：
-1. **禁用缓存**: `env.cacheDir = null`
+1. **使用 /tmp 缓存**: Vercel 唯一可写目录
 2. **顺序处理**: 一次处理一个 chunk，不并行
 3. **Singleton 模式**: 模型只加载一次，复用
 4. **量化模型**: 使用 `quantized: true`
