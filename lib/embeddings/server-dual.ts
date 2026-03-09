@@ -29,9 +29,16 @@ async function getTransformers() {
   const module = await import('@xenova/transformers');
   transformers = module;
   
-  // Configure for Node.js environment
+  // Configure for serverless environment (Vercel)
+  // Use WASM backend instead of native ONNX runtime
   module.env.allowLocalModels = false;
   module.env.useBrowserCache = false;
+  
+  // Force WASM backend (avoids libonnxruntime.so dependency)
+  module.env.backends.onnx.wasm.numThreads = 1;
+  module.env.backends.onnx.wasm.simd = true;
+  
+  console.log('[Embeddings] Configured to use WASM backend');
   
   return module;
 }
@@ -52,6 +59,7 @@ async function initSmallModel() {
   try {
     isInitializingSmall = true;
     console.log('[Embeddings] Initializing e5-small model (384-dim)...');
+    console.log('[Embeddings] Using WASM backend for serverless compatibility');
     
     const { pipeline } = await getTransformers();
     
@@ -63,6 +71,7 @@ async function initSmallModel() {
     return smallPipeline;
   } catch (error) {
     console.error('[Embeddings] Failed to initialize e5-small:', error);
+    smallPipeline = null; // Reset on failure
     throw error;
   } finally {
     isInitializingSmall = false;
@@ -85,6 +94,7 @@ async function initLargeModel() {
   try {
     isInitializingLarge = true;
     console.log('[Embeddings] Initializing e5-large model (1024-dim)...');
+    console.log('[Embeddings] Using WASM backend for serverless compatibility');
     
     const { pipeline } = await getTransformers();
     
@@ -96,6 +106,7 @@ async function initLargeModel() {
     return largePipeline;
   } catch (error) {
     console.error('[Embeddings] Failed to initialize e5-large:', error);
+    largePipeline = null; // Reset on failure
     throw error;
   } finally {
     isInitializingLarge = false;
