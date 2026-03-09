@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Turbopack is now the default in Next.js 16
+  turbopack: {},
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
@@ -10,28 +12,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // Webpack configuration for native modules
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Exclude native bindings from webpack bundling
-      config.externals = config.externals || [];
-      config.externals.push({
-        'sharp': 'commonjs sharp',
-        'onnxruntime-node': 'commonjs onnxruntime-node',
-        '@xenova/transformers': 'commonjs @xenova/transformers',
-      });
-      
-      // Ignore .node files
-      config.module = config.module || {};
-      config.module.rules = config.module.rules || [];
-      config.module.rules.push({
-        test: /\.node$/,
-        use: 'node-loader',
-      });
-    }
-    
-    return config;
-  },
+  // Opt-out native modules from bundling (sharp and @xenova/transformers are already in default list)
+  serverExternalPackages: ['onnxruntime-node'],
 };
 
 export default nextConfig;
