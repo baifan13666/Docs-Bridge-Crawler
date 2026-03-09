@@ -41,7 +41,9 @@ export async function GET(request: NextRequest) {
         console.log('[QStash Debug] Fetching logs...');
         // Get recent logs
         const logs = await client.logs({
-          count,
+          filter: {
+            count,
+          }
         });
 
         console.log(`[QStash Debug] Found ${logs.logs.length} logs`);

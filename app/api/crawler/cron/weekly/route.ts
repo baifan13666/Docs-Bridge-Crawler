@@ -108,12 +108,22 @@ export async function GET(request: NextRequest) {
           delay: queuedJobs.length * 5
         });
         
-        const result = await qstashClient.publishJSON({
+        const publishOptions: any = {
           url: workerURL,
           body: payload,
           retries: 3,
           delay: queuedJobs.length * 5
-        });
+        };
+
+        // Add Vercel bypass token if configured
+        if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+          publishOptions.headers = {
+            'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+          };
+          console.log('[Cron Weekly] Added Vercel bypass token to request');
+        }
+        
+        const result = await qstashClient.publishJSON(publishOptions);
 
         queuedJobs.push({
           source_id: source.id,

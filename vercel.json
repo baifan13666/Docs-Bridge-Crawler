@@ -12,5 +12,16 @@
       "path": "/api/crawler/cron/monthly",
       "schedule": "0 4 1 * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/api/crawler/worker",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    }
   ]
 }

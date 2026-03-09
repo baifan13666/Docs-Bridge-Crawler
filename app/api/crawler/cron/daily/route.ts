@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[Cron Daily] Queuing: ${source.name} (${source.id})`);
         
-        const result = await qstashClient.publishJSON({
+        const publishOptions: any = {
           url: workerURL,
           body: {
             source_id: source.id,
@@ -88,7 +88,16 @@ export async function GET(request: NextRequest) {
           },
           retries: 3,
           delay: queuedJobs.length * 5 // Stagger requests by 5 seconds
-        });
+        };
+
+        // Add Vercel bypass token if configured
+        if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+          publishOptions.headers = {
+            'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+          };
+        }
+        
+        const result = await qstashClient.publishJSON(publishOptions);
 
         queuedJobs.push({
           source_id: source.id,
