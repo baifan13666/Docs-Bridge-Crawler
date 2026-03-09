@@ -23,12 +23,30 @@ export const maxDuration = 300; // 5 minutes for crawling
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Crawler Worker] ========================================');
+    console.log('[Crawler Worker] Received request');
+    console.log('[Crawler Worker] Timestamp:', new Date().toISOString());
+    console.log('[Crawler Worker] Request URL:', request.url);
+    console.log('[Crawler Worker] Request headers:', {
+      'content-type': request.headers.get('content-type'),
+      'upstash-signature': request.headers.get('upstash-signature') ? 'present' : 'missing',
+      'user-agent': request.headers.get('user-agent')
+    });
+    
     // Read body once
     const bodyText = await request.text();
+    console.log('[Crawler Worker] Body length:', bodyText.length);
+    console.log('[Crawler Worker] Body preview:', bodyText.substring(0, 200));
     
     // Verify QStash signature
     const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
     const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
+
+    console.log('[Crawler Worker] Signature verification:', {
+      hasCurrentKey: !!currentSigningKey,
+      hasNextKey: !!nextSigningKey,
+      willVerify: !!(currentSigningKey && nextSigningKey)
+    });
 
     if (currentSigningKey && nextSigningKey) {
       const receiver = new Receiver({
@@ -40,32 +58,42 @@ export async function POST(request: NextRequest) {
 
       if (signature) {
         try {
+          console.log('[Crawler Worker] Verifying signature...');
           await receiver.verify({
             signature,
             body: bodyText,
           });
+          console.log('[Crawler Worker] ✅ Signature verified');
         } catch (error) {
-          console.error('[Crawler Worker] Invalid signature:', error);
+          console.error('[Crawler Worker] ❌ Invalid signature');
+          console.error('[Crawler Worker] Signature error:', error);
           return NextResponse.json(
             { success: false, error: 'Invalid signature' },
             { status: 401 }
           );
         }
+      } else {
+        console.warn('[Crawler Worker] ⚠️ No signature provided');
       }
+    } else {
+      console.warn('[Crawler Worker] ⚠️ Signature verification skipped (keys not configured)');
     }
 
-    console.log('[Crawler Worker] ========================================');
     console.log('[Crawler Worker] Processing crawl job...');
 
     // Parse request body
     const body = JSON.parse(bodyText);
     const { source_id, triggered_by, timestamp } = body;
 
-    console.log(`[Crawler Worker] Source ID: ${source_id}`);
-    console.log(`[Crawler Worker] Triggered by: ${triggered_by}`);
-    console.log(`[Crawler Worker] Timestamp: ${timestamp}`);
+    console.log('[Crawler Worker] Parsed body:', {
+      source_id,
+      triggered_by,
+      timestamp,
+      fullBody: body
+    });
 
     if (!source_id) {
+      console.error('[Crawler Worker] ❌ Missing source_id');
       return NextResponse.json(
         { success: false, error: 'source_id is required' },
         { status: 400 }
@@ -75,21 +103,33 @@ export async function POST(request: NextRequest) {
     // Get source configuration
     const source = getSourceById(source_id);
     if (!source) {
+      console.error('[Crawler Worker] ❌ Source not found:', source_id);
       return NextResponse.json(
         { success: false, error: 'Source not found' },
         { status: 404 }
       );
     }
 
+    console.log('[Crawler Worker] Source found:', {
+      id: source.id,
+      name: source.name,
+      url: source.url,
+      type: source.type,
+      category: source.category,
+      frequency: source.crawl_frequency
+    });
+
     const crawlURL = source.url;
 
     // Validate URL
     if (source.type === 'pdf' && !isValidPDFURL(crawlURL)) {
+      console.error('[Crawler Worker] ❌ Invalid PDF URL:', crawlURL);
       return NextResponse.json(
         { success: false, error: 'Invalid PDF URL' },
         { status: 400 }
       );
     } else if (source.type === 'html' && !isValidCrawlURL(crawlURL)) {
+      console.error('[Crawler Worker] ❌ Invalid HTML URL:', crawlURL);
       return NextResponse.json(
         { success: false, error: 'Invalid HTML URL' },
         { status: 400 }
@@ -97,19 +137,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Crawl document
-    console.log(`[Crawler Worker] Crawling ${source.type.toUpperCase()}: ${crawlURL}`);
+    console.log(`[Crawler Worker] Starting crawl...`);
+    console.log(`[Crawler Worker] Type: ${source.type.toUpperCase()}`);
+    console.log(`[Crawler Worker] URL: ${crawlURL}`);
+    
+    const crawlStartTime = Date.now();
     let normalizedDoc;
 
     try {
       if (source.type === 'pdf') {
+        console.log('[Crawler Worker] Crawling PDF...');
         const pdfContent = await crawlPDF(crawlURL);
+        console.log('[Crawler Worker] PDF crawled, normalizing...');
         normalizedDoc = normalizePDFDocument(pdfContent, source);
       } else {
+        console.log('[Crawler Worker] Crawling HTML...');
         const htmlContent = await crawlHTML(crawlURL);
+        console.log('[Crawler Worker] HTML crawled, normalizing...');
         normalizedDoc = normalizeHTMLDocument(htmlContent, source);
       }
+      
+      const crawlDuration = Date.now() - crawlStartTime;
+      console.log(`[Crawler Worker] ✅ Crawl completed in ${crawlDuration}ms`);
     } catch (crawlError) {
-      console.error('[Crawler Worker] Crawl error:', crawlError);
+      console.error('[Crawler Worker] ❌ Crawl error:', {
+        message: crawlError instanceof Error ? crawlError.message : 'Unknown error',
+        stack: crawlError instanceof Error ? crawlError.stack : undefined,
+        error: crawlError
+      });
       return NextResponse.json(
         { 
           success: false, 
@@ -120,18 +175,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate document
+    console.log('[Crawler Worker] Validating document...');
     const validation = validateDocument(normalizedDoc);
     if (!validation.valid) {
-      console.error('[Crawler Worker] Validation failed:', validation.errors);
+      console.error('[Crawler Worker] ❌ Validation failed:', validation.errors);
       return NextResponse.json(
         { success: false, error: 'Document validation failed', details: validation.errors },
         { status: 400 }
       );
     }
 
-    console.log(`[Crawler Worker] ✅ Crawled: ${normalizedDoc.title}`);
-    console.log(`[Crawler Worker] Quality score: ${normalizedDoc.quality_score}/100`);
-    console.log(`[Crawler Worker] Word count: ${normalizedDoc.metadata.word_count}`);
+    console.log('[Crawler Worker] ✅ Document validated');
+    console.log('[Crawler Worker] Document details:', {
+      title: normalizedDoc.title,
+      quality_score: normalizedDoc.quality_score,
+      word_count: normalizedDoc.metadata.word_count,
+      language: normalizedDoc.metadata.language,
+      trust_level: normalizedDoc.trust_level
+    });
 
     // Sanitize content
     const sanitizedContent = sanitizeContent(normalizedDoc.content);

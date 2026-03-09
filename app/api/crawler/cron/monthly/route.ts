@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { qstashClient } from '@/lib/qstash/client';
+import { qstashClient, getBaseURL } from '@/lib/qstash/client';
 import { GOVERNMENT_SOURCES } from '@/lib/crawler/sources';
 
 export const runtime = 'nodejs';
@@ -18,10 +18,16 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[Cron Monthly] ========================================');
     console.log('[Cron Monthly] Starting monthly crawl job...');
+    console.log('[Cron Monthly] Timestamp:', new Date().toISOString());
 
     // Verify cron secret
     const authHeader = request.headers.get('authorization');
     const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
+    
+    console.log('[Cron Monthly] Auth check:', {
+      hasAuthHeader: !!authHeader,
+      hasCronSecret: !!process.env.CRON_SECRET
+    });
     
     if (authHeader !== expectedAuth) {
       console.error('[Cron Monthly] Unauthorized request');
@@ -59,12 +65,21 @@ export async function GET(request: NextRequest) {
       error: string;
     }> = [];
 
+    const baseURL = getBaseURL();
+    const workerURL = `${baseURL}/api/crawler/worker`;
+    
+    console.log('[Cron Monthly] Environment:', {
+      baseURL,
+      workerURL,
+      hasQStashToken: !!process.env.QSTASH_TOKEN
+    });
+
     for (const source of monthlySources) {
       try {
         console.log(`[Cron Monthly] Queuing: ${source.name} (${source.id})`);
         
         const result = await qstashClient.publishJSON({
-          url: `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3001'}/api/crawler/worker`,
+          url: workerURL,
           body: {
             source_id: source.id,
             triggered_by: 'cron_monthly',
@@ -80,7 +95,7 @@ export async function GET(request: NextRequest) {
           message_id: result.messageId
         });
 
-        console.log(`[Cron Monthly] ✅ Queued: ${source.name}`);
+        console.log(`[Cron Monthly] ✅ Queued: ${source.name} (messageId: ${result.messageId})`);
       } catch (error) {
         console.error(`[Cron Monthly] ❌ Failed to queue ${source.name}:`, error);
         failedJobs.push({
@@ -93,8 +108,14 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Cron Monthly] ✅ Queued ${queuedJobs.length} jobs`);
     if (failedJobs.length > 0) {
-      console.log(`[Cron Monthly] ⚠️ Failed ${failedJobs.length} jobs`);
+      console.log(`[Cron Monthly] ⚠️ Failed ${failedJobs.length} jobs:`, failedJobs);
     }
+    console.log('[Cron Monthly] Summary:', {
+      total: monthlySources.length,
+      queued: queuedJobs.length,
+      failed: failedJobs.length,
+      messageIds: queuedJobs.map(j => j.message_id)
+    });
     console.log('[Cron Monthly] ========================================');
 
     return NextResponse.json({
