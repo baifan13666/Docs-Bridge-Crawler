@@ -87,24 +87,28 @@ Worker (Node.js) → @xenova/transformers (WASM backend) ✅
 
 ## 模型
 
-- **Small**: e5-small-v2 (384-dim)
-- **Large**: e5-large-v2 (1024-dim)
+- **单模型策略**: e5-small-v2 (384-dim)
+- **内存优化**: 使用相同的 embedding 填充 small 和 large 字段
+- **原因**: Vercel 免费版 1GB 内存无法同时加载两个模型
+
+注意：虽然数据库有 `embedding_small` 和 `embedding_large` 两个字段，但为了适应内存限制，两个字段存储相同的 384-dim embedding。
 
 ## 性能
 
-- **Cold Start**: 10-20 秒（首次加载模型）
+- **Cold Start**: 5-10 秒（首次加载模型）
 - **Warm Start**: < 1 秒
-- **内存使用**: ~800MB（两个模型）
+- **内存使用**: ~400MB（单模型）
 - **处理方式**: 顺序处理以节省内存
 - **完全免费**: 无需 API key
 
 ## 内存优化
 
 Vercel 免费版限制 1GB 内存，优化措施：
-1. **使用 /tmp 缓存**: Vercel 唯一可写目录
-2. **顺序处理**: 一次处理一个 chunk，不并行
-3. **Singleton 模式**: 模型只加载一次，复用
-4. **量化模型**: 使用 `quantized: true`
+1. **单模型**: 只使用 e5-small (384-dim)，不加载 e5-large
+2. **使用 /tmp 缓存**: Vercel 唯一可写目录
+3. **顺序处理**: 一次处理一个 chunk，不并行
+4. **Singleton 模式**: 模型只加载一次，复用
+5. **量化模型**: 使用 `quantized: true`
 
 ## 故障排除
 
@@ -128,12 +132,11 @@ Vercel 免费版限制 1GB 内存，优化措施：
 - Vercel 会自动使用 package.json 中的 build 脚本
 
 ### 如果看到内存不足错误 (OOM)
-- Vercel 免费版限制 1GB 内存
-- 已优化为顺序处理（不并行）
-- 如果还是 OOM，考虑：
-  1. 只使用一个模型（small 或 large）
-  2. 减少 chunk 数量
-  3. 升级 Vercel Pro（3GB 内存）
+- 当前已优化为单模型（e5-small 384-dim）
+- 如果还是 OOM：
+  1. 减少 chunk 大小或数量
+  2. 升级 Vercel Pro（3GB 内存）
+  3. 考虑使用外部 embedding API
 - Next.js 16 默认使用 Turbopack
 - 必须显式使用 `--no-turbopack` 来使用 webpack
 - `serverExternalPackages` 告诉 Next.js 不要打包这些模块

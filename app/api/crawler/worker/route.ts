@@ -334,17 +334,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 2: Generate embeddings with e5 models (384-dim + 1024-dim)
+    // Step 2: Generate embeddings with e5-small (384-dim)
     console.log('[Crawler Worker] Step 2: Generating embeddings...');
-    console.log('[Crawler Worker] Using dual embedding strategy:');
-    console.log('[Crawler Worker] - Small (384-dim): for fast coarse search');
-    console.log('[Crawler Worker] - Large (1024-dim): for accurate reranking');
-    console.log('[Crawler Worker] Backend: WASM (no native dependencies)');
+    console.log('[Crawler Worker] Using single model strategy (memory optimization):');
+    console.log('[Crawler Worker] - Model: e5-small-v2 (384-dim)');
+    console.log('[Crawler Worker] - Backend: WASM (no native dependencies)');
+    console.log('[Crawler Worker] - Note: Using same embedding for both small/large to fit in 1GB memory');
     
     const chunkTexts = chunks.map(c => c.text);
     const embeddings = await generateBatchDualEmbeddings(chunkTexts);
 
-    console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} dual embeddings`);
+    console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} embeddings`);
 
     // Step 3: Save chunks with embeddings to database
     console.log('[Crawler Worker] Step 3: Saving chunks with dual embeddings...');

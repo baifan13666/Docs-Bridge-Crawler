@@ -3,6 +3,8 @@
  * 
  * Uses @xenova/transformers with WASM backend (not native ONNX)
  * Works on Vercel Node.js runtime
+ * 
+ * MEMORY OPTIMIZATION: Only uses e5-small to fit in 1GB limit
  */
 
 import { pipeline, env } from '@xenova/transformers';
@@ -18,83 +20,48 @@ env.useBrowserCache = false;
 // Use /tmp for cache on Vercel (writable directory)
 env.cacheDir = '/tmp/.transformers-cache';
 
-// Model configurations - MUST use e5 models
-const SMALL_MODEL = 'Xenova/e5-small-v2'; // 384-dim
-const LARGE_MODEL = 'Xenova/e5-large-v2'; // 1024-dim
+// Model configuration - ONLY use e5-small to save memory
+const MODEL = 'Xenova/e5-small-v2'; // 384-dim
 
-// Singleton instances
-let smallPipeline: any = null;
-let largePipeline: any = null;
-let isInitializingSmall = false;
-let isInitializingLarge = false;
+// Singleton instance
+let pipeline_instance: any = null;
+let isInitializing = false;
 
 /**
  * Initialize e5-small model (384-dim)
  */
-async function initSmallModel() {
-  if (smallPipeline) return smallPipeline;
+async function initModel() {
+  if (pipeline_instance) return pipeline_instance;
   
   // Wait if already initializing
-  while (isInitializingSmall) {
+  while (isInitializing) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
-  if (smallPipeline) return smallPipeline;
+  if (pipeline_instance) return pipeline_instance;
 
   try {
-    isInitializingSmall = true;
+    isInitializing = true;
     console.log('[Embeddings] Initializing e5-small model (384-dim) with WASM backend...');
     
-    smallPipeline = await pipeline('feature-extraction', SMALL_MODEL, {
+    pipeline_instance = await pipeline('feature-extraction', MODEL, {
       quantized: true,
     });
     
     console.log('[Embeddings] ✅ e5-small model ready (WASM)');
-    return smallPipeline;
+    return pipeline_instance;
   } catch (error) {
     console.error('[Embeddings] Failed to initialize e5-small:', error);
-    smallPipeline = null;
+    pipeline_instance = null;
     throw error;
   } finally {
-    isInitializingSmall = false;
+    isInitializing = false;
   }
 }
 
 /**
- * Initialize e5-large model (1024-dim)
- */
-async function initLargeModel() {
-  if (largePipeline) return largePipeline;
-  
-  // Wait if already initializing
-  while (isInitializingLarge) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  if (largePipeline) return largePipeline;
-
-  try {
-    isInitializingLarge = true;
-    console.log('[Embeddings] Initializing e5-large model (1024-dim) with WASM backend...');
-    
-    largePipeline = await pipeline('feature-extraction', LARGE_MODEL, {
-      quantized: true,
-    });
-    
-    console.log('[Embeddings] ✅ e5-large model ready (WASM)');
-    return largePipeline;
-  } catch (error) {
-    console.error('[Embeddings] Failed to initialize e5-large:', error);
-    largePipeline = null;
-    throw error;
-  } finally {
-    isInitializingLarge = false;
-  }
-}
-
-/**
- * Generate dual embeddings (both 384-dim and 1024-dim)
- * Sequential to save memory
+ * Generate single embedding (384-dim)
+ * For dual embedding compatibility, returns same embedding for both small and large
  */
 export async function generateDualEmbeddings(text: string): Promise<{
   small: number[];
@@ -104,30 +71,27 @@ export async function generateDualEmbeddings(text: string): Promise<{
     // For documents, use "passage: " prefix (e5 models requirement)
     const prefixedText = text.startsWith('passage: ') ? text : `passage: ${text}`;
     
-    // Generate sequentially to save memory (not parallel)
-    const smallModel = await initSmallModel();
-    const smallOutput = await smallModel(prefixedText, {
+    const model = await initModel();
+    const output = await model(prefixedText, {
       pooling: 'mean',
       normalize: true,
     });
-    const small = Array.from(smallOutput.data) as number[];
+    const embedding = Array.from(output.data) as number[];
     
-    const largeModel = await initLargeModel();
-    const largeOutput = await largeModel(prefixedText, {
-      pooling: 'mean',
-      normalize: true,
-    });
-    const large = Array.from(largeOutput.data) as number[];
-    
-    return { small, large };
+    // Return same embedding for both (memory optimization)
+    // Database expects dual embeddings, so we provide the same one twice
+    return { 
+      small: embedding,  // 384-dim
+      large: embedding   // 384-dim (same as small to save memory)
+    };
   } catch (error) {
-    console.error('[Embeddings] Error generating dual embeddings:', error);
-    throw new Error(`Failed to generate dual embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('[Embeddings] Error generating embedding:', error);
+    throw new Error(`Failed to generate embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Generate batch dual embeddings for multiple texts
+ * Generate batch embeddings for multiple texts
  * Process sequentially to avoid memory issues
  */
 export async function generateBatchDualEmbeddings(texts: string[]): Promise<Array<{
@@ -135,8 +99,8 @@ export async function generateBatchDualEmbeddings(texts: string[]): Promise<Arra
   large: number[];
 }>> {
   try {
-    console.log(`[Embeddings] Generating batch dual embeddings for ${texts.length} texts...`);
-    console.log('[Embeddings] Processing sequentially to conserve memory...');
+    console.log(`[Embeddings] Generating batch embeddings for ${texts.length} texts...`);
+    console.log('[Embeddings] Using single model (e5-small 384-dim) to conserve memory...');
     
     const results: Array<{ small: number[]; large: number[] }> = [];
     
@@ -147,10 +111,10 @@ export async function generateBatchDualEmbeddings(texts: string[]): Promise<Arra
       results.push(embedding);
     }
     
-    console.log(`[Embeddings] ✅ Batch dual embeddings completed: ${results.length} items`);
+    console.log(`[Embeddings] ✅ Batch embeddings completed: ${results.length} items`);
     return results;
   } catch (error) {
-    console.error('[Embeddings] Error generating batch dual embeddings:', error);
-    throw new Error(`Failed to generate batch dual embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('[Embeddings] Error generating batch embeddings:', error);
+    throw new Error(`Failed to generate batch embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
