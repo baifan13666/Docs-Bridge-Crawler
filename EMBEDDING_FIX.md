@@ -14,7 +14,7 @@
 ```json
 {
   "scripts": {
-    "build": "next build --no-turbopack"
+    "build": "next build --webpack"
   }
 }
 ```
@@ -64,15 +64,18 @@ Vercel Dashboard → Settings → General → "Clear Build Cache"
 ### 3. 重新部署
 ```bash
 git add .
-git commit -m "Fix: Force WASM backend for transformers.js"
+git commit -m "Fix: Disable Turbopack and use webpack to exclude native ONNX"
 git push
 ```
 
 ### 4. 验证
-日志应该显示：
+构建日志应该显示：
+- ✅ 使用 webpack（不是 Turbopack）
+- ✅ 没有 `[turbopack]_runtime.js` 错误
+
+运行日志应该显示：
 - ✅ `[Embeddings] Initializing e5-small model (384-dim) with WASM backend...`
 - ✅ `[Embeddings] ✅ e5-small model ready (WASM)`
-- ✅ `[Embeddings] ✅ e5-large model ready (WASM)`
 - ❌ 不应该看到 `libonnxruntime.so` 错误
 
 ## 架构
@@ -101,12 +104,19 @@ Worker (Node.js) → @xenova/transformers (WASM backend) ✅
 4. 清除 Vercel 构建缓存
 5. 强制重新部署
 
-### 如果看到 "Failed to load external module"
-- 这说明 webpack 配置没有生效
-- 确认 `next.config.ts` 中有 `turbopack: {}` 配置（允许 webpack 配置共存）
-- 确认 `serverExternalPackages` 包含 `onnxruntime-node` 和 `sharp`
+### 如果还是看到 libonnxruntime.so 错误
+1. 确认 build 脚本使用 `--no-turbopack` 标志
+2. 确认 `serverExternalPackages` 包含 `@xenova/transformers`
+3. 删除 `.next` 和 `node_modules/.cache`
+4. 清除 Vercel 构建缓存
+5. 强制重新部署
+
+### 如果看到 Turbopack 相关错误
+- 确认 `package.json` 中 build 脚本有 `--no-turbopack`
+- 确认 `next.config.ts` 中没有 `turbopack: {}` 配置
+- Vercel 会自动使用 package.json 中的 build 脚本
 
 ### Next.js 16 注意事项
 - Next.js 16 默认使用 Turbopack
-- 如果有 webpack 配置，必须同时有 `turbopack: {}` 配置
-- `serverComponentsExternalPackages` 已移到 `serverExternalPackages`
+- 必须显式使用 `--no-turbopack` 来使用 webpack
+- `serverExternalPackages` 告诉 Next.js 不要打包这些模块
