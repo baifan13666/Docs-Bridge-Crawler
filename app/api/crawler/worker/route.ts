@@ -15,6 +15,7 @@ import { crawlHTML, isValidCrawlURL } from '@/lib/crawler/html';
 import { crawlPDF, isValidPDFURL } from '@/lib/crawler/pdf';
 import { normalizeHTMLDocument, normalizePDFDocument, validateDocument, sanitizeContent } from '@/lib/crawler/normalize';
 import { chunkDocument } from '@/lib/nlp/chunking';
+import { generateBatchDualEmbeddings } from '@/lib/embeddings/server-dual';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -333,41 +334,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 2: Generate embeddings with e5-large (1024-dim)
-    console.log('[Crawler Worker] Step 2: Generating embeddings with e5-large (1024-dim)...');
+    // Step 2: Generate embeddings with e5 models (384-dim + 1024-dim)
+    console.log('[Crawler Worker] Step 2: Generating embeddings...');
     console.log('[Crawler Worker] Using dual embedding strategy:');
     console.log('[Crawler Worker] - Small (384-dim): for fast coarse search');
     console.log('[Crawler Worker] - Large (1024-dim): for accurate reranking');
-    console.log('[Crawler Worker] Calling Edge Runtime embedding API...');
+    console.log('[Crawler Worker] Backend: WASM (no native dependencies)');
     
     const chunkTexts = chunks.map(c => c.text);
-    const embeddingApiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/embeddings`;
-    
-    console.log(`[Crawler Worker] Embedding API URL: ${embeddingApiUrl}`);
-    
-    // Call Edge Runtime embedding API
-    const embeddingResponse = await fetch(embeddingApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ texts: chunkTexts }),
-    });
+    const embeddings = await generateBatchDualEmbeddings(chunkTexts);
 
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text();
-      console.error('[Crawler Worker] Embedding API error:', {
-        status: embeddingResponse.status,
-        statusText: embeddingResponse.statusText,
-        body: errorText,
-      });
-      throw new Error(`Embedding API error (${embeddingResponse.status}): ${errorText}`);
-    }
-
-    const embeddingData = await embeddingResponse.json();
-    const { embeddings } = embeddingData;
-
-    console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} dual embeddings via Edge API`);
+    console.log(`[Crawler Worker] ✅ Generated ${embeddings.length} dual embeddings`);
 
     // Step 3: Save chunks with embeddings to database
     console.log('[Crawler Worker] Step 3: Saving chunks with dual embeddings...');

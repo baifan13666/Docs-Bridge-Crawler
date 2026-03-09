@@ -1,80 +1,47 @@
 /**
- * Dual Embedding Generation (Server-Side)
+ * Node.js Runtime Embeddings with WASM Backend
  * 
- * Hybrid search strategy:
- * - e5-small (384-dim): Fast coarse search
- * - e5-large (1024-dim): Accurate reranking
- * 
- * Uses Transformers.js on Node.js for serverless compatibility
+ * Uses @xenova/transformers with WASM backend (not native ONNX)
+ * Works on Vercel Node.js runtime
  */
 
-// Model configurations
+import { pipeline, env } from '@xenova/transformers';
+
+// CRITICAL: Configure BEFORE any pipeline creation
+// Force WASM backend, disable native ONNX runtime
+env.backends.onnx.wasm.numThreads = 1;
+env.backends.onnx.wasm.simd = true;
+env.allowLocalModels = false;
+env.allowRemoteModels = true;
+env.useBrowserCache = false;
+
+// Model configurations - MUST use e5 models
 const SMALL_MODEL = 'Xenova/e5-small-v2'; // 384-dim
 const LARGE_MODEL = 'Xenova/e5-large-v2'; // 1024-dim
 
 // Singleton instances
 let smallPipeline: any = null;
 let largePipeline: any = null;
-let isInitializingSmall = false;
-let isInitializingLarge = false;
-let transformers: any = null;
-
-/**
- * Lazy load transformers library
- */
-async function getTransformers() {
-  if (transformers) return transformers;
-  
-  // Dynamic import to avoid build-time issues
-  const module = await import('@xenova/transformers');
-  transformers = module;
-  
-  // Configure for serverless environment (Vercel)
-  // Use WASM backend instead of native ONNX runtime
-  module.env.allowLocalModels = false;
-  module.env.useBrowserCache = false;
-  
-  // Force WASM backend (avoids libonnxruntime.so dependency)
-  module.env.backends.onnx.wasm.numThreads = 1;
-  module.env.backends.onnx.wasm.simd = true;
-  
-  console.log('[Embeddings] Configured to use WASM backend');
-  
-  return module;
-}
 
 /**
  * Initialize e5-small model (384-dim)
  */
 async function initSmallModel() {
   if (smallPipeline) return smallPipeline;
-  if (isInitializingSmall) {
-    // Wait for initialization
-    while (isInitializingSmall) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    return smallPipeline;
-  }
 
   try {
-    isInitializingSmall = true;
-    console.log('[Embeddings] Initializing e5-small model (384-dim)...');
-    console.log('[Embeddings] Using WASM backend for serverless compatibility');
-    
-    const { pipeline } = await getTransformers();
+    console.log('[Embeddings] Initializing e5-small model (384-dim) with WASM backend...');
     
     smallPipeline = await pipeline('feature-extraction', SMALL_MODEL, {
       quantized: true,
     });
     
-    console.log('[Embeddings] ✅ e5-small model ready');
+    console.log('[Embeddings] ✅ e5-small model ready (WASM)');
     return smallPipeline;
   } catch (error) {
     console.error('[Embeddings] Failed to initialize e5-small:', error);
-    smallPipeline = null; // Reset on failure
+    smallPipeline = null;
     throw error;
-  } finally {
-    isInitializingSmall = false;
   }
 }
 
@@ -83,83 +50,25 @@ async function initSmallModel() {
  */
 async function initLargeModel() {
   if (largePipeline) return largePipeline;
-  if (isInitializingLarge) {
-    // Wait for initialization
-    while (isInitializingLarge) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    return largePipeline;
-  }
 
   try {
-    isInitializingLarge = true;
-    console.log('[Embeddings] Initializing e5-large model (1024-dim)...');
-    console.log('[Embeddings] Using WASM backend for serverless compatibility');
-    
-    const { pipeline } = await getTransformers();
+    console.log('[Embeddings] Initializing e5-large model (1024-dim) with WASM backend...');
     
     largePipeline = await pipeline('feature-extraction', LARGE_MODEL, {
       quantized: true,
     });
     
-    console.log('[Embeddings] ✅ e5-large model ready');
+    console.log('[Embeddings] ✅ e5-large model ready (WASM)');
     return largePipeline;
   } catch (error) {
     console.error('[Embeddings] Failed to initialize e5-large:', error);
-    largePipeline = null; // Reset on failure
+    largePipeline = null;
     throw error;
-  } finally {
-    isInitializingLarge = false;
-  }
-}
-
-/**
- * Generate 384-dim embedding with e5-small (for coarse search)
- */
-export async function generateSmallEmbedding(text: string): Promise<number[]> {
-  try {
-    const model = await initSmallModel();
-    
-    // e5 models require "query: " prefix for queries
-    const prefixedText = text.startsWith('query: ') ? text : `query: ${text}`;
-    
-    const output = await model(prefixedText, {
-      pooling: 'mean',
-      normalize: true,
-    });
-    
-    return Array.from(output.data) as number[];
-  } catch (error) {
-    console.error('[Embeddings] Error generating small embedding:', error);
-    throw new Error(`Failed to generate small embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-/**
- * Generate 1024-dim embedding with e5-large (for reranking)
- */
-export async function generateLargeEmbedding(text: string): Promise<number[]> {
-  try {
-    const model = await initLargeModel();
-    
-    // e5 models require "query: " prefix for queries
-    const prefixedText = text.startsWith('query: ') ? text : `query: ${text}`;
-    
-    const output = await model(prefixedText, {
-      pooling: 'mean',
-      normalize: true,
-    });
-    
-    return Array.from(output.data) as number[];
-  } catch (error) {
-    console.error('[Embeddings] Error generating large embedding:', error);
-    throw new Error(`Failed to generate large embedding: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Generate dual embeddings (both 384-dim and 1024-dim)
- * Used for document processing
  */
 export async function generateDualEmbeddings(text: string): Promise<{
   small: number[];
@@ -168,7 +77,7 @@ export async function generateDualEmbeddings(text: string): Promise<{
   try {
     console.log('[Embeddings] Generating dual embeddings...');
     
-    // For documents, use "passage: " prefix
+    // For documents, use "passage: " prefix (e5 models requirement)
     const prefixedText = text.startsWith('passage: ') ? text : `passage: ${text}`;
     
     // Generate both embeddings in parallel
@@ -221,41 +130,4 @@ export async function generateBatchDualEmbeddings(texts: string[]): Promise<Arra
     console.error('[Embeddings] Error generating batch dual embeddings:', error);
     throw new Error(`Failed to generate batch dual embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
-
-/**
- * Cosine similarity between two vectors
- */
-export function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) {
-    throw new Error(`Vector dimensions don't match: ${a.length} vs ${b.length}`);
-  }
-  
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-/**
- * Get model information
- */
-export function getModelInfo() {
-  return {
-    smallModel: SMALL_MODEL,
-    largeModel: LARGE_MODEL,
-    smallDim: 384,
-    largeDim: 1024,
-    isSmallInitialized: smallPipeline !== null,
-    isLargeInitialized: largePipeline !== null,
-    isInitializingSmall,
-    isInitializingLarge,
-  };
 }
