@@ -70,12 +70,8 @@ export async function GET(request: NextRequest) {
             messageId: log.messageId,
             state: log.state,
             url: log.url,
-            time: new Date(log.createdAt).toISOString(),
-            error: log.error,
-            responseStatus: log.responseStatus,
-            responseBody: log.responseBody,
-            topicName: log.topicName,
-            scheduleId: log.scheduleId
+            time: new Date(log.time).toISOString(),
+            error: log.error || null,
           }))
         });
       }
@@ -139,8 +135,7 @@ export async function GET(request: NextRequest) {
         
         console.log('[QStash Debug] Message found:', {
           messageId: message.messageId,
-          url: message.url,
-          state: message.state
+          url: message.url
         });
 
         return NextResponse.json({
@@ -149,8 +144,7 @@ export async function GET(request: NextRequest) {
           message: {
             messageId: message.messageId,
             url: message.url,
-            createdAt: new Date(message.createdAt).toISOString(),
-            state: message.state,
+            createdAt: new Date(message.createdAt).toISOString()
           }
         });
       }
