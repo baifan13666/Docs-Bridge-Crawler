@@ -10,14 +10,20 @@
 
 ## 关键配置
 
+### package.json
+```json
+{
+  "scripts": {
+    "build": "next build --no-turbopack"
+  }
+}
+```
+
 ### next.config.ts
 ```typescript
 const nextConfig: NextConfig = {
-  // 需要空的 turbopack 配置来允许 webpack 配置
-  turbopack: {},
-  
-  // Next.js 16: serverComponentsExternalPackages 移到了 serverExternalPackages
-  serverExternalPackages: ['sharp', 'onnxruntime-node'],
+  // 将 @xenova/transformers 标记为外部包
+  serverExternalPackages: ['sharp', 'onnxruntime-node', '@xenova/transformers'],
   
   webpack: (config, { isServer }) => {
     if (isServer) {

@@ -1,17 +1,14 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Empty turbopack config to allow webpack config
-  turbopack: {},
-  
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
     },
   },
   
-  // External packages (moved from experimental in Next.js 16)
-  serverExternalPackages: ['sharp', 'onnxruntime-node'],
+  // External packages - prevent bundling native modules
+  serverExternalPackages: ['sharp', 'onnxruntime-node', '@xenova/transformers'],
   
   // Disable image optimization for crawler service
   images: {
