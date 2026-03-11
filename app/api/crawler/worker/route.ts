@@ -242,6 +242,8 @@ export async function POST(request: NextRequest) {
           title: normalizedDoc.title,
           content: sanitizedContent,
           trust_level: normalizedDoc.trust_level,
+          quality_score: normalizedDoc.quality_score,
+          word_count: normalizedDoc.metadata.word_count,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingDoc.id)
@@ -279,6 +281,8 @@ export async function POST(request: NextRequest) {
           document_type: normalizedDoc.document_type,
           source_url: normalizedDoc.source_url,
           trust_level: normalizedDoc.trust_level,
+          quality_score: normalizedDoc.quality_score,
+          word_count: normalizedDoc.metadata.word_count,
           icon: source.category === 'healthcare' ? 'medical_services' :
                 source.category === 'finance' ? 'account_balance' :
                 source.category === 'education' ? 'school' :
