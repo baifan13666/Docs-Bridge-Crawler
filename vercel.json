@@ -23,5 +23,18 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "app/api/crawler/worker/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/embeddings/large/route.ts": {
+      "maxDuration": 300
+    }
+  },
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  }
 }

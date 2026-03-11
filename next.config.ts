@@ -8,21 +8,23 @@ const nextConfig: NextConfig = {
   },
   
   // External packages - prevent bundling native modules
-  serverExternalPackages: ['sharp', 'onnxruntime-node', '@xenova/transformers'],
+  serverExternalPackages: ['onnxruntime-node', '@xenova/transformers'],
   
-  // Disable image optimization for crawler service
+  // Disable image optimization since we don't need it
   images: {
     unoptimized: true,
   },
   
-  // Webpack configuration to exclude native ONNX runtime
-  webpack: (config, { isServer }) => {
+  // Empty turbopack config to silence the warning
+  turbopack: {},
+  
+  // Webpack configuration to exclude native ONNX runtime (fallback)
+  webpack: (config: any, { isServer }: { isServer: boolean }) => {
     if (isServer) {
       // Alias native modules to false to prevent bundling
       config.resolve.alias = {
         ...config.resolve.alias,
-        'sharp$': false,
-        'onnxruntime-node$': false,
+        'onnxruntime-node': false,
       };
     }
     return config;
