@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         console.log('[Crawler Worker] Crawling HTML...');
         const htmlContent = await crawlHTML(crawlURL);
         console.log('[Crawler Worker] HTML crawled, normalizing...');
-        normalizedDoc = normalizeHTMLDocument(htmlContent, source);
+        normalizedDoc = normalizeHTMLDocument(htmlContent, source, crawlStartTime);
       }
       
       const crawlDuration = Date.now() - crawlStartTime;

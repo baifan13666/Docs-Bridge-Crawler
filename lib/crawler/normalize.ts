@@ -36,7 +36,8 @@ export interface NormalizedDocument {
  */
 export function normalizeHTMLDocument(
   content: CrawledHTMLContent,
-  source: GovernmentSource
+  source: GovernmentSource,
+  crawlStartTime?: number
 ): NormalizedDocument {
   const qualityScore = calculateQualityScore({
     wordCount: content.wordCount,
@@ -47,6 +48,43 @@ export function normalizeHTMLDocument(
     hasPublishedDate: !!content.publishedDate
   });
 
+    // Enhanced metadata collection
+    const enhancedMetadata = {
+      // Basic source info
+      source_id: source.id,
+      source_name: source.name,
+      country: source.country,
+      category: source.category,
+      language: content.language || source.language,
+      crawled_at: new Date().toISOString(),
+      
+      // Content metrics
+      word_count: content.wordCount,
+      author: content.author,
+      published_date: content.publishedDate,
+      
+      // Crawl performance
+      crawl_duration_ms: crawlStartTime ? Date.now() - crawlStartTime : undefined,
+      file_type: 'html',
+      
+      // Source classification
+      department: extractDepartment(source.name, content.title),
+      priority: source.priority || 'medium',
+      content_type: source.content_type || 'guide',
+      
+      // SEO and structure
+      has_structured_data: false, // HTML crawler doesn't extract structured data yet
+      meta_description: content.metadata.description,
+      keywords: content.metadata.keywords,
+      
+      // Quality indicators
+      quality_score: qualityScore,
+      trust_level: source.trust_level,
+      
+      // Original metadata for debugging
+      original_metadata: content.metadata
+    };
+
   return {
     title: content.title,
     content: content.content,
@@ -54,18 +92,7 @@ export function normalizeHTMLDocument(
     source_url: content.url,
     document_type: 'gov_crawled',
     trust_level: source.trust_level,
-    metadata: {
-      source_id: source.id,
-      source_name: source.name,
-      country: source.country,
-      category: source.category,
-      language: content.language || source.language,
-      crawled_at: new Date().toISOString(),
-      word_count: content.wordCount,
-      author: content.author,
-      published_date: content.publishedDate,
-      original_metadata: content.metadata
-    },
+    metadata: enhancedMetadata,
     quality_score: qualityScore
   };
 }
@@ -187,8 +214,40 @@ export function validateDocument(doc: NormalizedDocument): {
 }
 
 /**
- * Sanitize content for storage
+ * Extract department name from source name or document title
  */
+function extractDepartment(sourceName: string, title: string): string {
+  const text = `${sourceName} ${title}`.toLowerCase();
+  
+  // Common department patterns
+  if (text.includes('dswd') || text.includes('social welfare')) return 'DSWD';
+  if (text.includes('doh') || text.includes('health')) return 'DOH';
+  if (text.includes('deped') || text.includes('education')) return 'DepEd';
+  if (text.includes('dof') || text.includes('finance')) return 'DOF';
+  if (text.includes('dilg') || text.includes('local government')) return 'DILG';
+  if (text.includes('dole') || text.includes('labor')) return 'DOLE';
+  if (text.includes('da') || text.includes('agriculture')) return 'DA';
+  if (text.includes('denr') || text.includes('environment')) return 'DENR';
+  if (text.includes('dti') || text.includes('trade')) return 'DTI';
+  if (text.includes('dot') || text.includes('tourism')) return 'DOT';
+  if (text.includes('dpwh') || text.includes('public works')) return 'DPWH';
+  if (text.includes('dnd') || text.includes('defense')) return 'DND';
+  if (text.includes('doj') || text.includes('justice')) return 'DOJ';
+  if (text.includes('dfa') || text.includes('foreign affairs')) return 'DFA';
+  
+  // Malaysia
+  if (text.includes('moh') || text.includes('kesihatan')) return 'MOH';
+  if (text.includes('moe') || text.includes('pendidikan')) return 'MOE';
+  if (text.includes('mof') || text.includes('kewangan')) return 'MOF';
+  
+  // Singapore
+  if (text.includes('moh')) return 'MOH';
+  if (text.includes('moe')) return 'MOE';
+  if (text.includes('mas')) return 'MAS';
+  if (text.includes('cpf')) return 'CPF';
+  
+  return 'Unknown';
+}
 export function sanitizeContent(content: string): string {
   return content
     // Remove null bytes

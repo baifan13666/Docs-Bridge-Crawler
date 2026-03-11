@@ -33,6 +33,8 @@ interface Document {
   updated_at: string;
   chunk_count?: number;
   chunks?: Chunk[];
+  quality_score?: number;
+  word_count?: number;
 }
 
 interface Stats {
@@ -44,6 +46,22 @@ interface Stats {
   chunks_with_large: number;
   embedding_completion_rate: number;
 }
+
+// Shared styles
+const tableHeaderStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '12px 16px',
+  color: '#94a3b8',
+  fontSize: '14px',
+  fontWeight: '600',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em'
+};
+
+const tableCellStyle: React.CSSProperties = {
+  padding: '16px',
+  color: '#e2e8f0'
+};
 
 export default function DashboardPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -339,21 +357,70 @@ function TrustBadge({ level }: { level: number }) {
   );
 }
 
-const tableHeaderStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  color: '#94a3b8',
-  fontSize: '14px',
-  fontWeight: '600',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em'
-};
+function QualityBadge({ score }: { score?: number }) {
+  if (!score) return <span style={{ color: '#94a3b8' }}>-</span>;
+  
+  const getColor = () => {
+    if (score >= 80) return { bg: '#065f46', text: '#6ee7b7' };
+    if (score >= 60) return { bg: '#1e40af', text: '#93c5fd' };
+    if (score >= 40) return { bg: '#7c2d12', text: '#fdba74' };
+    return { bg: '#991b1b', text: '#fca5a5' };
+  };
 
-const tableCellStyle: React.CSSProperties = {
-  padding: '16px',
-  color: '#e2e8f0'
-};
+  const color = getColor();
 
+  return (
+    <span style={{
+      backgroundColor: color.bg,
+      color: color.text,
+      padding: '4px 12px',
+      borderRadius: '12px',
+      fontSize: '14px',
+      fontWeight: '600'
+    }}>
+      {score}/100
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    success: { bg: '#065f46', text: '#6ee7b7' },
+    failed: { bg: '#991b1b', text: '#fca5a5' },
+    running: { bg: '#1e40af', text: '#93c5fd' },
+  };
+
+  const color = colors[status] || { bg: '#64748b', text: '#e2e8f0' };
+
+  return (
+    <span style={{
+      backgroundColor: color.bg,
+      color: color.text,
+      padding: '4px 12px',
+      borderRadius: '12px',
+      fontSize: '14px',
+      fontWeight: '600',
+      textTransform: 'capitalize'
+    }}>
+      {status}
+    </span>
+  );
+}
+
+function EmbeddingBadge({ has, label }: { has: boolean; label: string }) {
+  return (
+    <span style={{
+      backgroundColor: has ? '#065f46' : '#64748b',
+      color: has ? '#6ee7b7' : '#cbd5e1',
+      padding: '2px 8px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: '600'
+    }}>
+      {label} {has ? '✓' : '○'}
+    </span>
+  );
+}
 
 function DocumentsTab({ 
   documents, 
@@ -683,142 +750,3 @@ function CrawlLogsTab({ crawlLogs }: { crawlLogs: CrawlLog[] }) {
     </div>
   );
 }
-
-function StatCard({ title, value, icon, color }: { 
-  title: string; 
-  value: string | number; 
-  icon: string;
-  color: string;
-}) {
-  return (
-    <div style={{
-      backgroundColor: '#1e293b',
-      borderRadius: '12px',
-      padding: '20px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      borderLeft: `4px solid ${color}`
-    }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '8px'
-      }}>
-        <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '500' }}>
-          {title}
-        </span>
-        <span style={{ fontSize: '24px' }}>{icon}</span>
-      </div>
-      <div style={{ 
-        fontSize: '1.5rem', 
-        fontWeight: 'bold', 
-        color: '#f1f5f9' 
-      }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function TrustBadge({ level }: { level: number }) {
-  const colors: Record<number, { bg: string; text: string }> = {
-    5: { bg: '#065f46', text: '#6ee7b7' },
-    4: { bg: '#1e40af', text: '#93c5fd' },
-    3: { bg: '#7c2d12', text: '#fdba74' },
-    2: { bg: '#991b1b', text: '#fca5a5' },
-    1: { bg: '#7f1d1d', text: '#fca5a5' },
-  };
-
-  const color = colors[level] || colors[3];
-
-  return (
-    <span style={{
-      backgroundColor: color.bg,
-      color: color.text,
-      padding: '4px 12px',
-      borderRadius: '12px',
-      fontSize: '14px',
-      fontWeight: '600'
-    }}>
-      Level {level}
-    </span>
-  );
-}
-
-function QualityBadge({ score }: { score: number }) {
-  const getColor = () => {
-    if (score >= 80) return { bg: '#065f46', text: '#6ee7b7' };
-    if (score >= 60) return { bg: '#1e40af', text: '#93c5fd' };
-    if (score >= 40) return { bg: '#7c2d12', text: '#fdba74' };
-    return { bg: '#991b1b', text: '#fca5a5' };
-  };
-
-  const color = getColor();
-
-  return (
-    <span style={{
-      backgroundColor: color.bg,
-      color: color.text,
-      padding: '4px 12px',
-      borderRadius: '12px',
-      fontSize: '14px',
-      fontWeight: '600'
-    }}>
-      {score}/100
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    success: { bg: '#065f46', text: '#6ee7b7' },
-    failed: { bg: '#991b1b', text: '#fca5a5' },
-    running: { bg: '#1e40af', text: '#93c5fd' },
-  };
-
-  const color = colors[status] || { bg: '#64748b', text: '#e2e8f0' };
-
-  return (
-    <span style={{
-      backgroundColor: color.bg,
-      color: color.text,
-      padding: '4px 12px',
-      borderRadius: '12px',
-      fontSize: '14px',
-      fontWeight: '600',
-      textTransform: 'capitalize'
-    }}>
-      {status}
-    </span>
-  );
-}
-
-function EmbeddingBadge({ has, label }: { has: boolean; label: string }) {
-  return (
-    <span style={{
-      backgroundColor: has ? '#065f46' : '#64748b',
-      color: has ? '#6ee7b7' : '#cbd5e1',
-      padding: '2px 8px',
-      borderRadius: '8px',
-      fontSize: '12px',
-      fontWeight: '600'
-    }}>
-      {label} {has ? '✓' : '○'}
-    </span>
-  );
-}
-
-const tableHeaderStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  color: '#94a3b8',
-  fontSize: '14px',
-  fontWeight: '600',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em'
-};
-
-const tableCellStyle: React.CSSProperties = {
-  padding: '16px',
-  color: '#e2e8f0'
-};
