@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "verify-deployment": "node scripts/verify-deployment.js",
+    "test-crawler": "node scripts/test-crawler.js",
+    "postinstall": "node scripts/create-sharp-stub.js"
   },
   "dependencies": {
     "@langchain/textsplitters": "^1.0.1",
@@ -34,6 +37,6 @@
     }
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.20.0"
   }
 }
