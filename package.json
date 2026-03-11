@@ -28,6 +28,11 @@
     "@types/react-dom": "^19",
     "typescript": "^5"
   },
+  "pnpm": {
+    "overrides": {
+      "sharp": "file:./sharp-stub"
+    }
+  },
   "engines": {
     "node": ">=18.0.0"
   }
