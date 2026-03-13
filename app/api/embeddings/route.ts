@@ -3,7 +3,7 @@
  * 
  * POST /api/embeddings
  * 
- * Generates embeddings using @xenova/transformers with WASM backend
+ * Generates embeddings using @huggingface/transformers with WASM backend
  * Runs on Vercel Edge Runtime for better compatibility
  */
 

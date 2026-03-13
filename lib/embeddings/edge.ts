@@ -1,13 +1,19 @@
 /**
  * Edge Runtime Embedding Generation
  * 
- * Uses @xenova/transformers with WASM backend
+ * Uses @huggingface/transformers with WASM backend
  * Compatible with Vercel Edge Runtime
  */
 
-import { pipeline, env } from '@xenova/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 
 // Configure for Edge Runtime at module level
+// Force WASM backend to avoid native dependencies
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.proxy = false;
+  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.simd = true;
+}
 env.allowLocalModels = false;
 env.useBrowserCache = false;
 
@@ -29,7 +35,7 @@ async function initSmallModel() {
     console.log('[Edge Embeddings] Initializing e5-small model (384-dim)...');
     
     smallPipeline = await pipeline('feature-extraction', SMALL_MODEL, {
-      quantized: true,
+      dtype: 'q8',
     });
     
     console.log('[Edge Embeddings] ✅ e5-small model ready');
@@ -51,7 +57,7 @@ async function initLargeModel() {
     console.log('[Edge Embeddings] Initializing e5-large model (1024-dim)...');
     
     largePipeline = await pipeline('feature-extraction', LARGE_MODEL, {
-      quantized: true,
+      dtype: 'q8',
     });
     
     console.log('[Edge Embeddings] ✅ e5-large model ready');

@@ -1,16 +1,20 @@
 /**
  * Local Embeddings with bge-small-en
  * 
- * Uses @xenova/transformers with WASM backend
+ * Uses @huggingface/transformers with WASM backend
  * Only generates 384-dim embeddings locally
  * 1024-dim embeddings are generated asynchronously via external API
  */
 
-import { pipeline, env } from '@xenova/transformers';
+import { pipeline, env } from '@huggingface/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
-env.backends.onnx.wasm.numThreads = 1;
-env.backends.onnx.wasm.simd = true;
+// Force WASM backend to avoid native dependencies
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.proxy = false;
+  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.simd = true;
+}
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;
@@ -40,7 +44,7 @@ async function initModel() {
     console.log('[Embeddings] Initializing bge-small-en model (384-dim) with WASM backend...');
     
     pipeline_instance = await pipeline('feature-extraction', MODEL, {
-      quantized: true,
+      dtype: 'q8',
     });
     
     console.log('[Embeddings] ✅ bge-small-en model ready (WASM)');
