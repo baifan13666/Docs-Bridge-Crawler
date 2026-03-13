@@ -10,17 +10,35 @@ import { pipeline, env } from '@huggingface/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
 // Use local WASM files instead of CDN to avoid ESM URL scheme error
+console.log('[Embeddings] Configuring WASM backend...');
+console.log('[Embeddings] Current env.backends:', JSON.stringify(env.backends, null, 2));
+
 if (env.backends?.onnx?.wasm) {
+  // Try to set wasmPaths - this should point to static assets
   env.backends.onnx.wasm.wasmPaths = '/wasm/';
   env.backends.onnx.wasm.proxy = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.simd = true;
+  
+  console.log('[Embeddings] WASM configuration set:');
+  console.log('[Embeddings] - wasmPaths:', env.backends.onnx.wasm.wasmPaths);
+  console.log('[Embeddings] - proxy:', env.backends.onnx.wasm.proxy);
+  console.log('[Embeddings] - numThreads:', env.backends.onnx.wasm.numThreads);
+  console.log('[Embeddings] - simd:', env.backends.onnx.wasm.simd);
+} else {
+  console.warn('[Embeddings] ⚠️ env.backends.onnx.wasm is not available!');
 }
 
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;
 env.cacheDir = '/tmp/.transformers-cache';
+
+console.log('[Embeddings] Environment configured:');
+console.log('[Embeddings] - allowLocalModels:', env.allowLocalModels);
+console.log('[Embeddings] - allowRemoteModels:', env.allowRemoteModels);
+console.log('[Embeddings] - useBrowserCache:', env.useBrowserCache);
+console.log('[Embeddings] - cacheDir:', env.cacheDir);
 
 // Model: bge-small-en for 384-dim embeddings
 const MODEL = 'Xenova/bge-small-en-v1.5'; // 384-dim
