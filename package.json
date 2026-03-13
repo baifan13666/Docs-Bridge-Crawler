@@ -11,7 +11,7 @@
     "type-check": "tsc --noEmit",
     "verify-deployment": "node scripts/verify-deployment.js",
     "test-crawler": "node scripts/test-crawler.js",
-    "postinstall": "node scripts/create-sharp-stub.js"
+    "postinstall": "node scripts/create-sharp-stub.js && node scripts/copy-wasm-files.js"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
@@ -21,12 +21,13 @@
     "@upstash/qstash": "^2.3.0",
     "cheerio": "^1.0.0-rc.12",
     "next": "16.1.6",
+    "onnxruntime-web": "^1.20.1",
     "pdf-parse": "^1.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
   "overrides": {
-    "onnxruntime-node": "npm:onnxruntime-web@^1.24.3"
+    "onnxruntime-node": "npm:onnxruntime-web@^1.20.1"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -37,7 +38,7 @@
   "pnpm": {
     "overrides": {
       "sharp": "file:./sharp-stub",
-      "onnxruntime-node": "npm:onnxruntime-web@^1.24.3"
+      "onnxruntime-node": "npm:onnxruntime-web@^1.20.1"
     }
   },
   "engines": {

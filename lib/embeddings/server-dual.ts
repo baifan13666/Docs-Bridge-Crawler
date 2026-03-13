@@ -9,12 +9,14 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
-// Force WASM backend to avoid native dependencies
+// Use local WASM files instead of CDN to avoid ESM URL scheme error
 if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = '/wasm/';
   env.backends.onnx.wasm.proxy = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.simd = true;
 }
+
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;

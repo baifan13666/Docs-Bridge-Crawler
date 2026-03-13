@@ -7,13 +7,15 @@
 
 import { pipeline, env } from '@huggingface/transformers';
 
-// Configure for Edge Runtime at module level
-// Force WASM backend to avoid native dependencies
+// CRITICAL: Configure BEFORE any pipeline creation
+// Use local WASM files instead of CDN
 if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = '/wasm/';
   env.backends.onnx.wasm.proxy = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.simd = true;
 }
+
 env.allowLocalModels = false;
 env.useBrowserCache = false;
 
