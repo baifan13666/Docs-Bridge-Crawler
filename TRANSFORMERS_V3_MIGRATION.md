@@ -6,7 +6,7 @@ The `libonnxruntime.so.1.14.0` error occurs because `onnxruntime-node` requires 
 ## Solution Summary
 
 ### 1. Package Upgrade
-Migrated from deprecated `@xenova/transformers` v2.17.2 to official `@huggingface/transformers` v3.8.12
+Migrated from deprecated `@xenova/transformers` v2.17.2 to official `@huggingface/transformers` v3.8.1
 
 ### 2. Critical npm Overrides (The Key Fix)
 Added to `package.json`:
@@ -63,8 +63,15 @@ webpack: (config, { isServer }) => {
 
 ### 4. Code Updates
 
+#### Runtime Configuration
+All API routes use Node.js runtime:
+```typescript
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+```
+
 #### WASM Backend Configuration
-In `lib/embeddings/server-dual.ts`:
+In `lib/embeddings/server-dual.ts` and `lib/embeddings/edge.ts`:
 ```typescript
 import { pipeline, env } from '@huggingface/transformers';
 
@@ -84,33 +91,21 @@ if (env.backends?.onnx?.wasm) {
 
 1. **npm overrides** prevent `onnxruntime-node` from being installed at all
 2. **WASM backend** runs entirely in JavaScript/WebAssembly (portable, no native deps)
-3. **Webpack externals** prevent bundling issues
-4. **Resolve aliases** ensure no accidental native module imports
+3. **Node.js runtime** provides better compatibility and performance than Edge runtime
+4. **Webpack externals** prevent bundling issues
+5. **Resolve aliases** ensure no accidental native module imports
 
 ## Key Insight
 Webpack aliases alone aren't enough - you must prevent the native package from being installed using npm overrides. This is the critical piece that makes Vercel deployment work.
 
-## Next Steps
+## Deployment Status
 
-1. Delete `node_modules` and lock files:
-   ```bash
-   rm -rf node_modules package-lock.json pnpm-lock.yaml
-   ```
+✅ All API routes configured with Node.js runtime
+✅ WASM backend configured in both embedding modules
+✅ npm overrides in place
+✅ pnpm-lock.yaml updated with @huggingface/transformers v3.8.1
 
-2. Reinstall dependencies:
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
-
-3. Test locally:
-   ```bash
-   npm run build
-   npm start
-   ```
-
-4. Deploy to Vercel - the native library error should be resolved!
+Ready for Vercel deployment!
 
 ## References
 - [Hugging Face Transformers.js v3 Docs](https://huggingface.co/docs/transformers.js/v3.8.1/en/custom_usage)

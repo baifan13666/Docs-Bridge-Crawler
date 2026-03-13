@@ -1,16 +1,16 @@
 /**
- * Edge Runtime Embeddings API
+ * Node.js Runtime Embeddings API
  * 
  * POST /api/embeddings
  * 
  * Generates embeddings using @huggingface/transformers with WASM backend
- * Runs on Vercel Edge Runtime for better compatibility
+ * Runs on Vercel Node.js Runtime
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateBatchDualEmbeddings } from '@/lib/embeddings/edge';
+import { generateBatchDualEmbeddings } from '@/lib/embeddings/server-dual';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
