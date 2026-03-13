@@ -1,5 +1,5 @@
 /**
- * Copy WASM files from onnxruntime-web to public directory
+ * Copy WASM and MJS files from onnxruntime-web to public directory
  * This allows Next.js to serve them as static assets
  */
 
@@ -15,20 +15,31 @@ if (!fs.existsSync(targetDir)) {
   console.log('✅ Created public/wasm directory');
 }
 
-// Copy all WASM files
-const wasmFiles = fs.readdirSync(sourceDir).filter(file => file.endsWith('.wasm'));
+// Copy all WASM and MJS files needed by onnxruntime-web
+const filesToCopy = [
+  'ort-wasm-simd-threaded.wasm',
+  'ort-wasm-simd-threaded.mjs',
+  'ort-wasm-simd-threaded.asyncify.wasm',
+  'ort-wasm-simd-threaded.asyncify.mjs',
+  'ort-wasm-simd-threaded.jsep.wasm',
+  'ort-wasm-simd-threaded.jsep.mjs',
+  'ort-wasm-simd-threaded.jspi.wasm',
+  'ort-wasm-simd-threaded.jspi.mjs',
+];
 
-if (wasmFiles.length === 0) {
-  console.log('⚠️  No WASM files found in onnxruntime-web/dist');
-  process.exit(0);
-}
+let copiedCount = 0;
 
-wasmFiles.forEach(file => {
+filesToCopy.forEach(file => {
   const sourcePath = path.join(sourceDir, file);
   const targetPath = path.join(targetDir, file);
   
-  fs.copyFileSync(sourcePath, targetPath);
-  console.log(`✅ Copied ${file}`);
+  if (fs.existsSync(sourcePath)) {
+    fs.copyFileSync(sourcePath, targetPath);
+    console.log(`✅ Copied ${file}`);
+    copiedCount++;
+  } else {
+    console.log(`⚠️  File not found: ${file}`);
+  }
 });
 
-console.log(`\n✅ Successfully copied ${wasmFiles.length} WASM files to public/wasm/`);
+console.log(`\n✅ Successfully copied ${copiedCount} files to public/wasm/`);
