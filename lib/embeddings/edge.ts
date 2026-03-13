@@ -8,9 +8,15 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
-// Use local WASM files instead of CDN
+// Use absolute URL for WASM files
+const baseUrl = process.env.VERCEL_URL 
+  ? `https://${process.env.VERCEL_URL}`
+  : (process.env.NEXT_PUBLIC_VERCEL_URL 
+    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+    : 'http://localhost:3001');
+
 if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = '/wasm/';
+  env.backends.onnx.wasm.wasmPaths = `${baseUrl}/wasm/`;
   env.backends.onnx.wasm.proxy = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.simd = true;

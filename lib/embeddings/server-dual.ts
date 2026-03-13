@@ -9,12 +9,21 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // CRITICAL: Configure BEFORE any pipeline creation
-// Use local WASM files instead of CDN to avoid ESM URL scheme error
+// Use absolute URL for WASM files in serverless environment
+const baseUrl = process.env.VERCEL_URL 
+  ? `https://${process.env.VERCEL_URL}`
+  : (process.env.NEXT_PUBLIC_VERCEL_URL 
+    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+    : 'http://localhost:3001');
+
 if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = '/wasm/';
+  // Use full URL for WASM files
+  env.backends.onnx.wasm.wasmPaths = `${baseUrl}/wasm/`;
   env.backends.onnx.wasm.proxy = false;
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.simd = true;
+  
+  console.log('[Embeddings] WASM paths configured:', env.backends.onnx.wasm.wasmPaths);
 }
 
 env.allowLocalModels = false;
