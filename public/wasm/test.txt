@@ -1,0 +1,1 @@
+WASM files test - if you can see this, static files are working
